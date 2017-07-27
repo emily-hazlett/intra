@@ -68,8 +68,7 @@ for ii = 1:length(Files)
     meanTrace = mean(tracesChop,2);
     
     %% Plot figure
-    timestep = (prestim+poststim)/ samples;
-    timeaxis = timestep-prestim:timestep:poststim;
+    timeaxis = linspace(-prestim, poststim, samples);
     scaleAxis = [floor(rmp - 1.5*tracesSD), ceil(rmp + 1.5*tracesSD)];
     
     figure;
