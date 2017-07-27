@@ -19,6 +19,9 @@ prestim = 100; %ms in sweep before stim onset
 poststim = 900; %ms in sweep after stim onset
 headers = 3; % number of rows containing numeric data in ascii file before the traces start
 
+PSTH = 0; % Do you want to make a PSTH of the file?
+binsize = 20; % Set binsize of PSTH
+
 %% Batch through all files in the folder
 for ii = 1:length(Files)
     %% Import data
@@ -39,7 +42,7 @@ for ii = 1:length(Files)
         if any(traces(:,i)>threshold)
             [spikeHeight{i}, spikeIndex{i}] = findpeaks(traces(:,i), ...
                 'MinPeakHeight',threshold, ...
-                'MinPeakDistance', ceil(samples/1000) ...
+                'MinPeakDistance', ceil(1.5/(1000/samples)) ...
                 ); %Find spike peaks that are <10 SD above rmp and with a hold time of ~1s (assuming a 1s sweep)
             
         end
@@ -125,5 +128,10 @@ for ii = 1:length(Files)
     %     savefig([testname, '_overlay.fig'])
     print('-dtiff','-r500',[testname,'_overlay.tif'])
     %     clear celly samples reps time* *name
+    
+    %% PSTH if requested
+    if PSTH == 1
+        run('intraPSTH')
+    end
 end
 cd(folderold);
