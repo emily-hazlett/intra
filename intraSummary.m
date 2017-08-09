@@ -12,8 +12,9 @@
 
 folderold = cd;
 %% User editted info
-cd('D:\Intracellular\data analysis\processing\'); % Look for files in this folder
-Files = dir('*trace*.txt'); % Find txt files containing this phrase to batch through
+% cd('D:\Intracellular\data analysis\processing\'); % Look for files in this folder
+cd('C:\Data Processing\Processing\sub\'); % Look for files in this folder
+Files = dir('*.txt'); % Find txt files containing this phrase to batch through
 
 prestim = 100; %ms in sweep before stim onset
 poststim = 900; %ms in sweep after stim onset
@@ -69,13 +70,13 @@ for ii = 1:length(Files)
     
     %% Plot figure
     timeaxis = linspace(-prestim, poststim, samples);
-    scaleAxis = [floor(rmp - 1.5*tracesSD), ceil(rmp + 1.5*tracesSD)];
+    scaleAxis = [rmp - tracesSD, rmp + tracesSD];
     
     figure;
     set(gcf, 'Name', testname)
-    set(gcf, 'Color', 'none')
+    set(gcf, 'Color', 'w')
     set(gcf, 'GraphicsSmoothing', 'on')
-    set(gcf,'position', [0, 0, 900, 1200])
+    set(gcf,'position', [0, 0, 500, 900])
     
     % Heatplot
     ax(1) = subplot(10,1,[1,2]);
@@ -83,20 +84,28 @@ for ii = 1:length(Files)
     hold on
     for kk = 1:reps % Mark spikes on top of heatplot
         xpoint = repmat(kk,1,length(spikeIndex{kk}));
-        scatter(spikeIndex{kk},xpoint,'.','k')
+        scatter(spikeIndex{kk},xpoint,'k', 'LineWidth', 1.1)
+        %'.',
     end
-    colorbar('southoutside')
-    title(testname,'Interpreter','none','Fontsize',20)
+    c = colorbar;
+    colorbar('off')
+%     c = colorbar('southoutside');
+%     c.Label.String = 'RMP +/- 1SD';
+%     c.Ticks = [];
+    title(testname,'Interpreter','none','Fontsize',12)
     ylabel('Reps')
-    colormap(ax(1),'hot')
-    ax(1).XTick = [];
+    colormap(ax(1),'cool')
+    ax(1).XTickLabels = [];
+%     ax(1).XLim = [0 1000];
+    ax(1).XTick = linspace(floor(prestim/(1000/samples)), samples - floor(prestim/(1000/samples)), 5);
     ax(1).CLim = scaleAxis;
     ax(1).TickDir = 'out';
+    ax(1).LineWidth = 1.5;
     ax(1).Box = 'off';
     
     %Mean trace compared to rmp
     ax(2) = subplot(10,1,[3,4]);
-    plot(timeaxis,repmat(rmp,1,samples),'k', 'LineWidth', 1.5)
+    plot(timeaxis,repmat(rmp,1,samples),'k', 'LineWidth', 1.25)
     hold on
     plot(timeaxis, meanTrace, 'r', 'LineWidth', 0.5)
     ylim([rmp - 3*tracesSD, rmp + 3*tracesSD])
@@ -104,6 +113,7 @@ for ii = 1:length(Files)
     ylabel('mV')
     ax(2).XTick = [];
     ax(2).TickDir = 'out';
+    ax(2).LineWidth = 1.5;
     ax(2).Box = 'off';
     hold off
     
@@ -115,12 +125,13 @@ for ii = 1:length(Files)
         hold on
     end
     hold off
-    title(['RMP = ', num2str(rmp), ' mV  Spike height = ',num2str(spikeheightM), ' +/- ',num2str(spikeheightSD),' mV'],'Interpreter','none')
+    title(['RMP = ', num2str(rmp), ' mV  Spike height = ',num2str(spikeheightM), ' +/- ',num2str(spikeheightSD),' mV'],'Interpreter','none','Fontsize',9)
     ylabel('Individual Traces')
     xlabel('Time around stimulus onset(ms)')
     axis tight
     ax(3).YTick = [];
     ax(3).TickDir = 'out';
+    ax(3).LineWidth = 1.5;
     ax(3).Box = 'off';
     
     % save figure
