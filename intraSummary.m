@@ -22,6 +22,7 @@ headers = 3; % number of rows containing numeric data in ascii file before the t
 
 PSTH = 0; % Do you want to make a PSTH of the file?
 binsize = 20; % Set binsize of PSTH
+smoothwindow = 0; % Number of samples to smooth in heatplot. =0 to skip smoothing.
 
 %% Batch through all files in the folder
 for ii = 1:length(Files)
@@ -36,6 +37,19 @@ for ii = 1:length(Files)
     rmp = mean2(traces(traces>mean2(traces) - std2(traces) & traces<mean2(traces) + std2(traces)));
     tracesSD = std2(traces);
     
+    %% Smooth traces
+    if smoothwindow ~= 0
+        smoothTraces = zeros(samples-smoothwindow, reps);
+        for pp = 1:reps
+            for kk = 1:length(traces(:,pp))-smoothwindow
+                smoothTraces(kk, pp) = mean(traces(kk:kk+smoothwindow,pp));
+            end
+        end
+    else
+        smoothTraces = traces;
+    end
+    
+    %% Spike detect
     spikeIndex = cell(1,reps);
     spikeHeight = cell(1,reps);
     threshold = min(rmp + 10*tracesSD, -10); % Set spike threshold to the lesser of rmp+10SD and =10mV
@@ -80,24 +94,24 @@ for ii = 1:length(Files)
     
     % Heatplot
     ax(1) = subplot(10,1,[1,2]);
-    imagesc(traces')
+    imagesc(smoothTraces')
     hold on
     for kk = 1:reps % Mark spikes on top of heatplot
         xpoint = repmat(kk,1,length(spikeIndex{kk}));
-        scatter(spikeIndex{kk},xpoint,'k', 'LineWidth', 1.1)
+        scatter(spikeIndex{kk},xpoint,'k', 'LineWidth', 1.5)
         %'.',
     end
     c = colorbar;
     colorbar('off')
-%     c = colorbar('southoutside');
-%     c.Label.String = 'RMP +/- 1SD';
-%     c.Ticks = [];
+    %     c = colorbar('southoutside');
+    %     c.Label.String = 'RMP +/- 1SD';
+    %     c.Ticks = [];
     title(testname,'Interpreter','none','Fontsize',12)
     ylabel('Reps')
     colormap(ax(1),'cool')
     ax(1).XTickLabels = [];
-%     ax(1).XLim = [0 1000];
-    ax(1).XTick = linspace(floor(prestim/(1000/samples)), samples - floor(prestim/(1000/samples)), 5);
+    %     ax(1).XLim = [0 1000];
+    ax(1).XTick = linspace(floor(prestim/(1000/(samples-smoothwindow))), (samples-smoothwindow) - floor(prestim/(1000/(samples-smoothwindow))), 5);
     ax(1).CLim = scaleAxis;
     ax(1).TickDir = 'out';
     ax(1).LineWidth = 1.5;
@@ -105,10 +119,10 @@ for ii = 1:length(Files)
     
     %Mean trace compared to rmp
     ax(2) = subplot(10,1,[3,4]);
-    plot(timeaxis,repmat(rmp,1,samples),'k', 'LineWidth', 1.25)
-    hold on
     plot(timeaxis, meanTrace, 'r', 'LineWidth', 0.5)
-    ylim([rmp - 3*tracesSD, rmp + 3*tracesSD])
+    hold on
+    plot(timeaxis,repmat(meanRMP,1,samples),'k', 'LineWidth', 1.25)
+    ylim([meanRMP - 3*tracesSD, meanRMP + 3*tracesSD])
     xlim([-100 900])
     ylabel('mV')
     ax(2).XTick = [];
@@ -125,7 +139,7 @@ for ii = 1:length(Files)
         hold on
     end
     hold off
-    title(['RMP = ', num2str(rmp), ' mV  Spike height = ',num2str(spikeheightM), ' +/- ',num2str(spikeheightSD),' mV'],'Interpreter','none','Fontsize',9)
+    title(['RMP = ', num2str(meanRMP), ' mV  Spike height = ',num2str(spikeheightM), ' +/- ',num2str(spikeheightSD),' mV'],'Interpreter','none','Fontsize',9)
     ylabel('Individual Traces')
     xlabel('Time around stimulus onset(ms)')
     axis tight
@@ -136,7 +150,7 @@ for ii = 1:length(Files)
     
     % save figure
     %     savefig([testname, '_overlay.fig'])
-    print('-dtiff','-r500',[testname,'_overlay.tif'])
+    print('-dtiff','-r500',[testname,'_summary.tif'])
     %     clear celly samples reps time* *name
     
     %% PSTH if requested
