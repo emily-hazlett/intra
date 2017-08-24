@@ -121,8 +121,8 @@ for ii = 1:length(Files)
     ax(2) = subplot(10,1,[3,4]);
     plot(timeaxis, meanTrace, 'r', 'LineWidth', 0.5)
     hold on
-    plot(timeaxis,repmat(meanRMP,1,samples),'k', 'LineWidth', 1.25)
-    ylim([meanRMP - 3*tracesSD, meanRMP + 3*tracesSD])
+    plot(timeaxis,repmat(rmp,1,samples),'k', 'LineWidth', 1.25)
+    ylim([rmp - 3*tracesSD, rmp + 3*tracesSD])
     xlim([-100 900])
     ylabel('mV')
     ax(2).XTick = [];
@@ -139,7 +139,7 @@ for ii = 1:length(Files)
         hold on
     end
     hold off
-    title(['RMP = ', num2str(meanRMP), ' mV  Spike height = ',num2str(spikeheightM), ' +/- ',num2str(spikeheightSD),' mV'],'Interpreter','none','Fontsize',9)
+    title(['RMP = ', num2str(rmp), ' mV  Spike height = ',num2str(spikeheightM), ' +/- ',num2str(spikeheightSD),' mV'],'Interpreter','none','Fontsize',9)
     ylabel('Individual Traces')
     xlabel('Time around stimulus onset(ms)')
     axis tight
