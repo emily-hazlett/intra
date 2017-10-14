@@ -7,22 +7,21 @@
 % files matching a specified naming structure in a specifies folder and
 % create and save a .tiff image of the summary figure.
 
-% Created by EHazlett, last edited 2017-07-14
-
+% Created by EHazlett, last edited 2017-10-14
 
 folderold = cd;
 %% User editted info
-% cd('D:\Intracellular\data analysis\processing\'); % Look for files in this folder
+% cd('D:\Intracellular\data analysis\processing\sub\'); % Look for files in this folder
 cd('C:\Data Processing\Processing\sub\'); % Look for files in this folder
-Files = dir('*.txt'); % Find txt files containing this phrase to batch through
+Files = dir('*BBN062_trace_1.txt'); % Find txt files containing this phrase to batch through
 
-prestim = 100; %ms in sweep before stim onset
-poststim = 900; %ms in sweep after stim onset
+prestim = 300; %ms in sweep before stim onset
+poststim = 700; %ms in sweep after stim onset
+background = 200; %ms starting from end of poststim window to calculate background discharge
 headers = 3; % number of rows containing numeric data in ascii file before the traces start
 
 PSTH = 0; % Do you want to make a PSTH of the file?
 binsize = 20; % Set binsize of PSTH
-smoothwindow = 0; % Number of samples to smooth in heatplot. =0 to skip smoothing.
 
 %% Batch through all files in the folder
 for ii = 1:length(Files)
@@ -30,61 +29,78 @@ for ii = 1:length(Files)
     filename = Files(ii).name;
     testname = ['x', strrep(filename, '.txt','')];
     traces = importdata(filename);
-    traces = (traces.data(headers+1:end,:))/10;
+    Reps.stim = strrep(traces.textdata{1},' ', '');
+    Reps.trace = (traces.data(headers+1:end,:));
+    clear traces
     
-    %% Descriptives of traces
-    [samples, reps] = size(traces);
-    rmp = mean2(traces(traces>mean2(traces) - std2(traces) & traces<mean2(traces) + std2(traces)));
-    tracesSD = std2(traces);
+    %% Descriptives of test
+    [samples, reps] = size(Reps.trace);
+    rmp = mean2(Reps.trace(Reps.trace>mean2(Reps.trace) - std2(Reps.trace) ...
+        & Reps.trace<mean2(Reps.trace) + std2(Reps.trace)));
+    rmpSD = std2(Reps.trace);
     
-    %% Smooth traces
-    if smoothwindow ~= 0
-        smoothTraces = zeros(samples-smoothwindow, reps);
-        for pp = 1:reps
-            for kk = 1:length(traces(:,pp))-smoothwindow
-                smoothTraces(kk, pp) = mean(traces(kk:kk+smoothwindow,pp));
-            end
-        end
-    else
-        smoothTraces = traces;
-    end
+    %Mean trace with limited spike contamination
+    Reps.traceChop = Reps.trace;
+    Reps.traceChop(Reps.traceChop > rmp + 4*rmpSD) = rmp + 4*rmpSD; %Chop spikes at 4 SD above rmp for calculating mean trace
+    meanTrace = mean(Reps.traceChop,2);
     
     %% Spike detect
-    spikeIndex = cell(1,reps);
-    spikeHeight = cell(1,reps);
-    threshold = min(rmp + 10*tracesSD, -10); % Set spike threshold to the lesser of rmp+10SD and =10mV
+    Reps.spikeIndex = cell(1,reps);
+    Reps.spikeHeight = cell(1,reps);
+    threshold = min(rmp + 10*rmpSD, -10); % Set spike threshold to the lesser of rmp+10SD and =10mV
     for i = 1:reps
-        if any(traces(:,i)>threshold)
-            [spikeHeight{i}, spikeIndex{i}] = findpeaks(traces(:,i), ...
+        if any(Reps.trace(:,i)>threshold)
+            [Reps.spikeHeight{i}, Reps.spikeIndex{i}] = findpeaks(Reps.trace(:,i), ...
                 'MinPeakHeight',threshold, ...
                 'MinPeakDistance', ceil(1.5/(1000/samples)) ...
                 ); %Find spike peaks that are <10 SD above rmp and with a hold time of ~1s (assuming a 1s sweep)
-            
         end
     end
     
-    %Make a raster marking sample with spike peak
-    raster = zeros(samples, reps);
+    %% Make a raster marking sample with spike peak
     spikeheight = []; %vector of all spike heights for this test
+    Reps.raster = zeros(samples, reps);
     for i = 1:reps
-        if isempty(spikeIndex{i}) == 0 % Dont run for reps that have no spiking
-            for p = 1:length(spikeIndex{i})
-                raster(spikeIndex{i}(p),i) = 1;
-                spikeheight = cat(1, spikeheight, spikeHeight{i}(p));
+        if isempty(Reps.spikeIndex{i}) == 0 % Dont run for reps that have no spiking
+            for p = 1:length(Reps.spikeIndex{i})
+                Reps.raster(Reps.spikeIndex{i}(p),i) = 1;
+                spikeheight = cat(1, spikeheight, Reps.spikeHeight{i}(p));
             end
         end
     end
-    spikeheightM = mean(spikeheight);
-    spikeheightSD = std(spikeheight);
-    
-    %Mean trace with limited spike contamination
-    tracesChop = traces;
-    tracesChop(tracesChop>rmp + 4*tracesSD) = rmp + 4*tracesSD; %Chop spikes at 4 SD above rmp for calculating mean trace
-    meanTrace = mean(tracesChop,2);
+
+    %% Sound bar
+    if any(strcmp(Reps.stim,{'None', 'NoneIR'})) % how long is the stim duration?
+        stimlength = 0;
+    elseif any(strcmp(Reps.stim,{'BBN062', 'LFH'}))
+        stimlength = 62;elseif strcmp(Reps.stim, 'BatAgg')
+        stimlength = 48;
+    elseif any(strcmp(Reps.stim,{'Chevron', 'ChevronNL', 'FreqStp2', 'Complex'}))
+        stimlength = 5;
+    elseif strcmp(Reps.stim, 'Noisy')
+        stimlength = 52;
+    elseif strcmp(Reps.stim, 'MFVh')
+        stimlength = 70;
+    elseif strcmp(Reps.stim, 'MFVnl')
+        stimlength = 90;
+    elseif strcmp(Reps.stim, 'short')
+        stimlength = 1;
+    elseif any(strcmp(Reps.stim,{'Flat', 'DFM'}))
+        stimlength = 2;
+    elseif any(strcmp(Reps.stim,{'UFM', 'ChevronRev'}))
+        stimlength = 3;
+    elseif strcmp(Reps.stim, 'FreqStp1')
+        stimlength = 6;
+    elseif strcmp(Reps.stim, 'MFVt')
+        stimlength = 13;
+    else
+        stimLength = 1;
+    end
+    barcolor = [0.5 0.5 0.5];
     
     %% Plot figure
     timeaxis = linspace(-prestim, poststim, samples);
-    scaleAxis = [rmp - tracesSD, rmp + tracesSD];
+    scaleAxis = [rmp - rmpSD, rmp + rmpSD];
     
     figure;
     set(gcf, 'Name', testname)
@@ -94,24 +110,21 @@ for ii = 1:length(Files)
     
     % Heatplot
     ax(1) = subplot(10,1,[1,2]);
-    imagesc(smoothTraces')
+    imagesc(Reps.trace')
     hold on
     for kk = 1:reps % Mark spikes on top of heatplot
-        xpoint = repmat(kk,1,length(spikeIndex{kk}));
-        scatter(spikeIndex{kk},xpoint,'k', 'LineWidth', 1.5)
+        xpoint = repmat(kk,1,length(Reps.spikeIndex{kk}));
+        scatter(Reps.spikeIndex{kk},xpoint,'k', 'LineWidth', 1.5)
         %'.',
     end
-    c = colorbar;
+    hold off
     colorbar('off')
-    %     c = colorbar('southoutside');
-    %     c.Label.String = 'RMP +/- 1SD';
-    %     c.Ticks = [];
     title(testname,'Interpreter','none','Fontsize',12)
     ylabel('Reps')
     colormap(ax(1),'cool')
     ax(1).XTickLabels = [];
-    %     ax(1).XLim = [0 1000];
-    ax(1).XTick = linspace(floor(prestim/(1000/(samples-smoothwindow))), (samples-smoothwindow) - floor(prestim/(1000/(samples-smoothwindow))), 5);
+    ax(1).XTick = linspace(floor((prestim-100)/(1000/samples)), ...
+        floor((poststim+prestim-100)/(1000/samples)), 5);
     ax(1).CLim = scaleAxis;
     ax(1).TickDir = 'out';
     ax(1).LineWidth = 1.5;
@@ -122,40 +135,57 @@ for ii = 1:length(Files)
     plot(timeaxis, meanTrace, 'r', 'LineWidth', 0.5)
     hold on
     plot(timeaxis,repmat(rmp,1,samples),'k', 'LineWidth', 1.25)
-    ylim([rmp - 3*tracesSD, rmp + 3*tracesSD])
-    xlim([-100 900])
+    ylim([min([rmp - 2*rmpSD, min(meanTrace)]), ...
+        max([rmp + 2*rmpSD, max(meanTrace)])])
+    xlim([-prestim poststim])
+    fill([0, stimlength, stimlength, 0], ...
+        [max(ylim), max(ylim), min(ylim), min(ylim)], barcolor, ...
+        'EdgeColor', 'none', 'FaceAlpha', 0.1)
+    hold off
     ylabel('mV')
     ax(2).XTick = [];
     ax(2).TickDir = 'out';
     ax(2).LineWidth = 1.5;
     ax(2).Box = 'off';
-    hold off
     
     % Individual Traces
+    tracePlotter = Reps.trace;
     ax(3) = subplot(10,1,[5,10]);
     for kk = 1:reps
-        traces = traces -range(traces(:,kk)) - 2;
-        plot(timeaxis,traces(:,kk),'k')
+        tracePlotter = tracePlotter -range(tracePlotter(:,kk)) - 5;
+        plot(timeaxis,tracePlotter(:,kk),'k')
         hold on
     end
+    axis tight
+    fill([0, stimlength, stimlength, 0], ...
+        [max(ylim), max(ylim), min(ylim), min(ylim)], barcolor, ...
+        'EdgeColor', 'none', 'FaceAlpha', 0.1)
     hold off
-    title(['RMP = ', num2str(rmp), ' mV  Spike height = ',num2str(spikeheightM), ' +/- ',num2str(spikeheightSD),' mV'],'Interpreter','none','Fontsize',9)
+    title(['RMP = ', num2str(round(rmp,1)), 'mV', ...
+        ' BG = ', num2str(1000 * sum(sum(Reps.raster(samples - floor(background/(1000/samples)):end,:)))/(background*reps)), 'Hz', ...
+        ' Spike height = ',num2str(round(mean(spikeheight),1)), ...
+        ' +/- ',num2str(round(std(spikeheight),1)),'mV'], ...
+        'Interpreter','none','Fontsize',9)
     ylabel('Individual Traces')
     xlabel('Time around stimulus onset(ms)')
-    axis tight
     ax(3).YTick = [];
     ax(3).TickDir = 'out';
     ax(3).LineWidth = 1.5;
     ax(3).Box = 'off';
+    clear tracePlotter
     
     % save figure
-    %     savefig([testname, '_overlay.fig'])
     print('-dtiff','-r500',[testname,'_summary.tif'])
-    %     clear celly samples reps time* *name
     
     %% PSTH if requested
     if PSTH == 1
+        pie = cd;
+        cd('C:\Users\emily\OneDrive\Documents\GitHub\intra')
         run('intraPSTH')
+        cd(pie)
+        clear pie
     end
+    clear samples reps Reps rmp* p ii kk meanTrace spikeheight ...
+        stimlength timeaxis scaleAxis threshold xpoint testname
 end
 cd(folderold);
