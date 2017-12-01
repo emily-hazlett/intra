@@ -14,8 +14,8 @@ clear all
 
 folderold = cd;
 %% User editted info
-cd('C:\Data Processing\Processing\sub\'); % Look for files in this folder
-Files = dir('*3345_1*All_trace.txt'); % Find txt files containing this phrase to batch through
+cd('C:\Data Processing\Processing\sub\1195\'); % Look for files in this folder
+Files = dir('*_1_All_trace.txt'); % Find txt files containing this phrase to batch through
 
 sweeplength = 1000; %ms in sweep
 background = 200; %ms from end of sweep to calculate rmp
@@ -29,7 +29,7 @@ for ii = 1:length(Files)
     %% Import data
     filename = Files(ii).name;
     traces = importdata(filename);
-    Reps.stim = traces.textdata(1,2:end);
+    Reps.stim = strrep(traces.textdata(1,2:end),' ','');
     Reps.pulsepolarity = traces.data(1,:);
     Reps.pulsevoltage = traces.data(2,:);
     Reps.timestamp = traces.data(3,:);
@@ -47,9 +47,9 @@ for ii = 1:length(Files)
         clear repper
     end
     
-    figure
-    histogram(Reps.trace)
-    title(strrep(filename,'.txt',''),'Interpreter','none','Fontsize',12)
+%     figure
+%     histogram(Reps.trace)
+%     title(strrep(filename,'.txt',''),'Interpreter','none','Fontsize',12)
     
     %% Select reps to be dropped
     rmpSmooth = zeros(1,reps-smoothBin);
@@ -67,7 +67,7 @@ for ii = 1:length(Files)
     Reps.increasing = Reps.increasing(gt(Reps.increasing,reps/2)); %Only include increasing reps from second half of recording
     
     repper = gt([repmat(mean(Reps.rmp(1:floor(smoothBin/2))),1,floor(smoothBin/2)), ...
-        rmpSmooth, repmat(mean(Reps.rmp(reps-ceil(smoothBin/2)+1:end)),1,ceil(smoothBin/2))], deltaV);
+        rmpSmooth, repmat(mean(Reps.rmp(reps-ceil(smoothBin/2)+1:end)),1,ceil(smoothBin/2))], badrmp);
     Reps.badrmpFront = find(repper);
     Reps.badrmpFront = Reps.badrmpFront(lt(Reps.badrmpFront,reps/2));
     Reps.badrmpBack = find(repper);
@@ -81,11 +81,11 @@ for ii = 1:length(Files)
     if ~isempty(Reps.decreasing)
         Reps.todrop(1:max(Reps.decreasing)) = true;
     end
-    if ~isempty(Reps.badrmpFront)
-        Reps.todrop(min(Reps.badrmpFront):end) = true;
-    end
     if ~isempty(Reps.badrmpBack)
-        Reps.todrop(1:max(Reps.badrmpBack)) = true;
+        Reps.todrop(min(Reps.badrmpBack):end) = true;
+    end
+    if ~isempty(Reps.badrmpFront)
+        Reps.todrop(1:max(Reps.badrmpFront)) = true;
     end
     
     %% Plot and save figure
@@ -106,63 +106,76 @@ for ii = 1:length(Files)
     plot(ceil(smoothBin/2):length(rmpSmooth)+ceil(smoothBin/2)-1, rmpSmooth, 'LineWidth', 2)
     
     testname = ['x', strrep(filename, '.txt','')];
-%     print('-dtiff','-r500',[testname,'_dropreps.tif'])
+    print('-dtiff','-r500',[testname,'_dropreps.tif'])
     
     %% Drop Reps
     stimList = unique(Reps.stim);
     Reps.stim(:,Reps.todrop) = [];
     Reps.trace(:,Reps.todrop) = [];
     
-    
-    for pp = 5%:length(stimList) %Save txt files for each stim
+    %% Save txt files for each stim
+    for pp = 1:length(stimList)
         grouper = strcmp(stimList{pp}, Reps.stim); % drop reps for this stim
         if isempty(Reps.stim(grouper)) %Don't do anything if all reps are dropped
             continue
         end
-        stimreps{pp} = Reps.pulsepolarity(:,grouper);
-        stimreps{pp} = [stimreps; Reps.pulsevoltage(:,grouper)];
-        stimreps{pp} = [stimreps; Reps.timestamp(:,grouper)];
-        stimreps{pp} = [stimreps; Reps.trace(:,grouper)];
-        texter{pp} = Reps.stim(grouper);
-    end
+        stimreps = Reps.pulsepolarity(:,grouper);
+        stimreps = [stimreps; Reps.pulsevoltage(:,grouper)];
+        stimreps = [stimreps; Reps.timestamp(:,grouper)];
+        stimreps = [stimreps; Reps.trace(:,grouper)];
+        texter = Reps.stim(grouper);
         
-        if ~isequal(length(unique(stimreps(1,:))),1) && ...
-                ~isequal(length(unique(stimreps(2,:))),1)
-            
-        end
-            
-        for mm = 2:length(texter)-1
-            if isequal(stimreps(2,mm), stimreps(2,mm-1)) &&
-                count = 1; % Save txt file for each test run
-                ff = 1;
-                for ee = 2:length(texter)-1
-                    if stimreps(3,ee) - stimreps(3,ee-1) > 9800000 %Split multiple tests, min time difference
-                        daterSub = stimreps(:,ff:ee);
-                        texterSub = texter(:,ff:ee);
-                        txtname = strrep(filename, 'All_trace', [stimList{pp},'_trace', '_', num2str(count)]);
-                        fid = fopen(txtname, 'w');
-                        fprintf(fid,[repmat('%s \t',1,length(texter)-1), '%s'],string(texterSub));
-                        fprintf(fid,'\n');
-                        fclose(fid);
-                        dlmwrite(txtname, daterSub, '-append', 'delimiter', '\t','roffset', 0);
-                        
-                        ff = ee+1;
-                        count = count+1;
-                    end
-                end
-                if count == 1 %Still save single txt file if only 1 test was run
-                    txtname = strrep(filename, 'All_trace', [stimList{pp},'_trace', '_', num2str(count)]);
-                    fid = fopen(txtname, 'w');
-                    fprintf(fid,[repmat('%s \t',1,length(texter)-1), '%s'],string(texter));
-                    fprintf(fid,'\n');
-                    fclose(fid);
-                    dlmwrite(txtname, stimreps, '-append', 'delimiter', '\t','roffset', 0);
-                end
-                clear dater grouper txtname fid
+        % Where do different pulse tests occur
+        indPol = find(diff(stimreps(1,:))~=0);
+        indVolt = find(diff(stimreps(2,:))~=0);
+        indTests = unique(sort([reshape(indPol,[],1);reshape(indVolt,[],1)])); % reshape forces col vector
+        
+        % Find and save separate tests
+        count = 1;
+        ff = 1;
+        if ~isempty(indTests) % Save a different txt file for each test
+            indTests = sort([0;reshape(indTests,[],1); length(texter)]);
+            for kk = 1:length(indTests)-1
+                stimrepsX = stimreps(:,indTests(kk)+1:indTests(kk+1));
+                texterX = texter(:,indTests(kk)+1:indTests(kk+1));
+                txtname = strrep(filename, 'All_trace', [stimList{pp},'_trace', '_', num2str(count)]);
+                fid = fopen(txtname, 'w');
+                fprintf(fid,[repmat('%s \t',1,length(texterX)-1), '%s'],texterX{:});
+                fprintf(fid,'\n');
+                fclose(fid);
+                dlmwrite(txtname, stimrepsX, 'precision','%f', '-append', 'delimiter', '\t','roffset', 0);
+                clear stimrepsX* texterX*
+                count = count + 1;
             end
+        else % save one text file if there's only one test
+            txtname = strrep(filename, 'All_trace', [stimList{pp},'_trace', '_', num2str(count)]);
+            fid = fopen(txtname, 'w');
+            fprintf(fid,[repmat('%s \t',1,length(texter)-1), '%s'],texter{:});
+            fprintf(fid,'\n');
+            fclose(fid);
+            dlmwrite(txtname, stimreps, 'precision','%f', '-append', 'delimiter', '\t','roffset', 0);
         end
-        disp([num2str(ii), '/', num2str(length(Files))]);
+        clear grouper stimreps* texter* ind*
+    end
+    disp([num2str(ii), '/', num2str(length(Files))]);
     clear Reps reps pp ii samples
 end
 clear headers *stim background
 cd(folderold);
+
+
+
+%% Old junk
+
+% % Split based on differences in timestamp
+% count = 1; % Save txt file for each test run
+% 
+% if count == 1 %Still save single txt file if only 1 test was run
+%     txtname = strrep(filename, 'All_trace', [stimList{pp},'_trace', '_', num2str(count)]);
+%     fid = fopen(txtname, 'w');
+%     fprintf(fid,[repmat('%s \t',1,length(texter)-1), '%s'],string(texter));
+%     fprintf(fid,'\n');
+%     fclose(fid);
+%     dlmwrite(txtname, stimreps, '-append', 'delimiter', '\t','roffset', 0);
+% end
+% clear dater grouper txtname fid

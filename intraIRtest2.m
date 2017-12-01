@@ -61,10 +61,9 @@ for ii = 1:length(Files)
     end
     
     %% Cut header and tail from pulse traces
-    Pulses.pulser1 = Pulses.traceChange < -0.5 | Pulses.traceChange > 0.5;
-    Pulses.pulser2 = Pulses.pulser1;
-    Pulses.pulser1(floor(samples/3):end,:) = false; %Only include samples from first third of pulse
-    Pulses.pulser2(1:2*floor(samples/3),:) = false; %Only include samples from last third of pulse
+    Pulses.bigshift = Pulses.traceChange < -0.5 | Pulses.traceChange > 0.5;
+    Pulses.offset = Pulses.trace - repmat(mean(Pulses.trace), samples, 1) > 1.5 ...
+        | Pulses.trace - repmat(mean(Pulses.trace), samples, 1) < -1.5;
     
     %% Find stable state of IR test
     %Need real data to logic
@@ -75,18 +74,8 @@ for ii = 1:length(Files)
     % Label samples to drop by rep to mantain matrix shape
     Pulses.todrop = false(samples,reps);
     for kk = 1:reps
-        if ~isempty(find(Pulses.pulser1(:,kk), 1, 'last'))
-            Pulses.todrop(1:find(Pulses.pulser1(:,kk), 1, 'last'), kk) = true;
-        end
-        if ~isempty(find(Pulses.pulser2(:,kk), 1, 'first'))
-            Pulses.todrop(find(Pulses.pulser2(:,kk), 1, 'first'):end, kk) = true;
-        end
-%         if ~isempty(find(Pulses.stable1(:,kk), 1, 'first'))
-%             Pulses.todrop(find(Pulses.stable1(:,kk), 1, 'first'):end, kk) = true;
-%         end
-%         if ~isempty(find(Pulses.stable2(:,kk), 1, 'last'))
-%             Pulses.todrop(1:find(Pulses.stable2(:,kk), 1, 'last'), kk) = true;
-%         end
+        Pulses.todrop(Pulses.bigshift(:,kk),kk) = true;
+        Pulses.todrop(Pulses.offset(:,kk),kk) = true;
     end
     
     %% Find mean value of trace
