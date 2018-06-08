@@ -14,7 +14,7 @@ clear all
 folderold = cd;
 %% User editted info
 cd('C:\Data Processing\Processing\sub\1195\'); % Look for files in this folder
-Files = dir('1195_112817_*_1_All_trace.txt'); % Find txt files containing this phrase to batch through
+Files = dir('1195_112817_3474_1_withIR_All_trace.txt'); % Find txt files containing this phrase to batch through
 
 sweeplength = 1000; %ms in sweep
 background = 50; %ms from beginning of sweep to calculate rmp
@@ -22,7 +22,7 @@ smoothBin = 3; % How many reps do you want to smooth over to find dropreps?
 badrmp = -30; % Drop reps above this threshold
 deltaV = 5; % change in V for figuring out which reps to drop
 headers = 5; % number of rows containing numeric data in ascii file before the traces start
-IRTest = 0; %Does this have IR test data?
+IRTest = 1; %Does this have IR test data?
 
 %% Batch through all files in the folder
 for ii = 1:length(Files)
@@ -36,11 +36,12 @@ for ii = 1:length(Files)
     if IRTest == 1
         Reps.preIR = traces.data(4,:);
         Reps.postIR = traces.data(5,:);
+        Reps.trace = (traces.data(headers+1:end,:)); %DW increases mV by 10
     else
         Reps.preIR = NaN(size(traces.data(3,:)),'double'); % Add in NaN for IR data
         Reps.postIR = NaN(size(traces.data(3,:)),'double');
-    end
-    Reps.trace = (traces.data(headers+1:end,:))/10; %DW increases mV by 10
+        Reps.trace = (traces.data(headers+1:end,:))/10; %DW increases mV by 10
+    end  
     clear traces
     
     %% RMP distribution
@@ -93,6 +94,9 @@ for ii = 1:length(Files)
     Reps.badrmpEnding = Reps.badrmpEnding(gt(Reps.badrmpEnding,reps/2));
     clear repper
     
+    Reps.buzz = find(max(Reps.trace) > 500);
+    Reps.buzz = Reps.buzz(gt(Reps.buzz,reps/2));
+    
     %% Logicals of reps to drop based on rmp
     Reps.todrop = false(1,reps);
     frontshift = 0;
@@ -118,6 +122,11 @@ for ii = 1:length(Files)
     if ~isempty(Reps.badrmpBeginning)
         Reps.todrop(1:max(Reps.badrmpBeginning)) = true;
         frontshift = [frontshift, max(Reps.badrmpBeginning)];
+    end
+    
+    % If recording has buzzes toward end, drop rest of reps.
+    if ~isempty(Reps.buzz)
+        Reps.todrop(min(Reps.buzz):end) = true;
     end
     
     %% Drop Reps based on rmp
@@ -155,7 +164,7 @@ for ii = 1:length(Files)
     for pp = 1:reps2
         spikeHeight = [spikeHeight; Reps.spikeHeight{pp}-rmp];
     end
-    spikeThreshold = mean(spikeHeight)-std(spikeHeight);
+    spikeThreshold = min(mean(spikeHeight)-std(spikeHeight), -10);
     
     badspike = find(Reps.meanHeight < spikeThreshold);
     Reps.badspikeBeginning = badspike(lt(badspike,reps2/2));
@@ -244,7 +253,7 @@ for ii = 1:length(Files)
                 fprintf(fid,[repmat('%s \t',1,length(texterX)-1), '%s'],texterX{:});
                 fprintf(fid,'\n');
                 fclose(fid);
-                dlmwrite(txtname, stimrepsX, '-append', 'delimiter', '\t','roffset', 0);
+                dlmwrite(txtname, stimrepsX, 'precision','%f', '-append', 'delimiter', '\t','roffset', 0);
                 clear stimrepsX* texterX*
                 count = count + 1;
             end
@@ -264,7 +273,7 @@ for ii = 1:length(Files)
             fprintf(fid,[repmat('%s \t',1,length(texter)-1), '%s'],texter{:});
             fprintf(fid,'\n');
             fclose(fid);
-            dlmwrite(txtname, stimreps, '-append', 'delimiter', '\t','roffset', 0);
+            dlmwrite(txtname, stimreps, 'precision','%f', '-append', 'delimiter', '\t','roffset', 0);
         end
         clear grouper stimreps* texter* ind*
     end

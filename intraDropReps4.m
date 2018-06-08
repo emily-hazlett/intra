@@ -14,13 +14,13 @@ clear all
 
 folderold = cd;
 %% User editted info
-cd('C:\Data Processing\Processing\sub\1195\'); % Look for files in this folder
-Files = dir('*_1_All_trace.txt'); % Find txt files containing this phrase to batch through
+cd('C:\Data Processing\Processing\'); % Look for files in this folder
+Files = dir('1212*_All*.txt'); % Find txt files containing this phrase to batch through
 
 sweeplength = 1000; %ms in sweep
-background = 200; %ms from end of sweep to calculate rmp
+background = 500; %ms from end of sweep to calculate rmp
 smoothBin = 3; % How many reps do you want to smooth over to find dropreps?
-badrmp = -30; % Drop reps above this threshold
+badrmp = -40; % Drop reps above this threshold
 deltaV = 4; % change in V for figuring out which reps to drop
 headers = 3; % number of rows containing numeric data in ascii file before the traces start
 

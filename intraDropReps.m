@@ -15,7 +15,7 @@ clear all
 folderold = cd;
 %% User editted info
 cd('C:\Data Processing\Processing\sub\'); % Look for files in this folder
-Files = dir('*3345_1*All_trace.txt'); % Find txt files containing this phrase to batch through
+Files = dir('*042618*All_trace.txt'); % Find txt files containing this phrase to batch through
 
 sweeplength = 1000; %ms in sweep
 background = 200; %ms from end of sweep to calculate rmp
@@ -132,7 +132,7 @@ for ii = 1:length(Files)
         end
             
         for mm = 2:length(texter)-1
-            if isequal(stimreps(2,mm), stimreps(2,mm-1)) &&
+            if isequal(stimreps(2,mm), stimreps(2,mm-1))
                 count = 1; % Save txt file for each test run
                 ff = 1;
                 for ee = 2:length(texter)-1

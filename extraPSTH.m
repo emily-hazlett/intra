@@ -7,13 +7,15 @@
 % Created by EHazlett, last edited 2017-08-08
 %
 
-folder = 'C:\Data Processing\Processing\Extracted spikes\sub\';
-prestim = 100; %ms to examine before stimulus onset
-poststim = 900; %ms to examine after stimulus onset
+folder = 'C:\Data Processing\Processing\Extracted spikes\1231\';
+prestim = 150; %ms to examine before stimulus onset
+poststim = 850; %ms to examine after stimulus onset
+offsetstim = 50; %ms of background noise before stim actually plays
 binsize = 20; %ms bins in PSTH
 
 %% Find Files
-Files = dir('*spiketimes.txt');
+cd(folder);
+Files = dir('*3413*_1_spiketimes.txt');
 for pp = 1:length(Files)
     filename = Files(pp).name;
     
@@ -23,7 +25,7 @@ for pp = 1:length(Files)
     spiketimes = data.textdata(2:end, 1);
     spiketimes(cellfun('isempty', spiketimes)) = [];
     spiketimes = str2double(spiketimes);
-    stimnames_all = data.textdata(2:end, 2);
+    stimnames_all = data.textdata(2:length(data.data)+1, 2);
     stimtimes_all = data.data;
     clear data
     
@@ -47,9 +49,9 @@ for pp = 1:length(Files)
         spikeIndexbatch = cell(1,reps);
         for mm = 1:reps
             soundonset = stimtime(mm);
-            time0 = soundonset - prestim;
-            if any(spiketimes > ceil(time0) & spiketimes < floor(soundonset + poststim)) % Only run raster if spikes happened
-                spikes = spiketimes(spiketimes>time0 & spiketimes<soundonset+poststim);
+            time0 = soundonset - prestim + offsetstim;
+            if any(spiketimes > ceil(time0) & spiketimes < floor(soundonset + poststim + offsetstim)) % Only run raster if spikes happened
+                spikes = spiketimes(spiketimes>time0 & spiketimes<soundonset+poststim + offsetstim);
                 spikes = floor(spikes - time0)+1;
                 
                 spikeIndexbatch {mm} = spikes;
@@ -124,5 +126,5 @@ for pp = 1:length(Files)
     
     
     
-    print('-dtiff','-r500',strrep(filename, '.txt', '.tif'))% save figure
+    print('-dtiff','-r500',strrep(filename, '.txt', ['_', num2str(binsize), 'ms.tif']))% save figure
 end

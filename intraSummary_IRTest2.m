@@ -15,7 +15,7 @@ folderold = cd;
 %% User editted info
 % cd('D:\Intracellular\data analysis\processing\sub\'); % Look for files in this folder
 cd('C:\Data Processing\Processing\sub\1195\'); % Look for files in this folder
-Files = dir('1195_112817_3474_1_*_trace_*.txt'); % Find txt files containing this phrase to batch through
+Files = dir('1195_112817_3474_1_withIR_*_trace_*.txt'); % Find txt files containing this phrase to batch through
 
 prestim = 100; %ms in sweep before stim onset. BACkground discharge calc from prestim window.
 poststim = 900; %ms in sweep after stim onset
@@ -24,8 +24,8 @@ zone1 = [0, 50]; %Timezone1 = 0-50ms from sound onset
 zone2 = [100, 500]; %Timezone2 = 100-500ms from sound onset
 
 headers = 5; % number of rows containing numeric data in ascii file before the traces start
-IRTest = 0; %Does this have IR test data?
-save = 0; % save the figure as a tiff?
+IRTest = 1; %Does this have IR test data?
+save = 1; % save the figure as a tiff?
 
 %% Batch through all files in the folder
 for ii = 1:length(Files)
@@ -35,8 +35,8 @@ for ii = 1:length(Files)
     traces = importdata(filename);
     Reps.stim = regexprep(traces.textdata{1}, '\s+', '');
     if IRTest == 1
-        Reps.preIR = traces.data(headers-1,:);
-        Reps.postIR =traces.data(headers,:);
+        Reps.preIR = -traces.data(headers-1,:);
+        Reps.postIR = -traces.data(headers,:);
     else
         Reps.preIR = NaN(size(traces.data(3,:)),'double'); % Add in NaN for IR data
         Reps.postIR = NaN(size(traces.data(3,:)),'double');

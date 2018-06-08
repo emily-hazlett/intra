@@ -13,7 +13,7 @@ folderold = cd;
 %% User editted info
 % cd('D:\Intracellular\data analysis\processing\sub\'); % Look for files in this folder
 cd('C:\Data Processing\Processing\sub\1195\'); % Look for files in this folder
-Files = dir('1195_112817_3558_1_IRTest.txt'); % Find txt files containing this phrase to batch through
+Files = dir('1195_112817_3474_1_IRTest.txt'); % Find txt files containing this phrase to batch through
 
 prestim = 100; %ms in sweep before stim onset
 poststim = 900; %ms in sweep after stim onset
@@ -61,8 +61,8 @@ for ii = 1:length(Files)
     end
     
     %% Cut header and tail from pulse traces
-    Pulses.bigshift = Pulses.traceChange < -20 | Pulses.traceChange > 20; % Find the actual pulse
-    %     Pulses.bigshift = Pulses.traceChange < -0.5 | Pulses.traceChange > 0.5;
+%     Pulses.bigshift = Pulses.traceChange < -20 | Pulses.traceChange > 20; % Find the actual pulse
+    Pulses.spikers = Pulses.traceChange < -0.6 | Pulses.traceChange > 0.6;
     
     %% Find stable state of IR test
     %Need real data to logic
@@ -73,17 +73,13 @@ for ii = 1:length(Files)
     % Label samples to drop by rep to mantain matrix shape
     Pulses.todrop = false(samples,reps);
     for kk = 1:reps
-        Pulses.todrop(Pulses.bigshift(:,kk),kk) = true;
+        Pulses.todrop(Pulses.spikers(:,kk),kk) = true;
     end
     
     %% Find mean value of trace
     for kk = 1:reps
         repper = Pulses.trace(:,kk);
-        if any(Pulses.todrop(:,kk))
-            Pulses.voltage(kk) = mean(repper(~Pulses.todrop(:,kk)));
-        else
-            Pulses.voltage(kk) = mean(repper);
-        end
+        Pulses.voltage(kk) = mean(repper(~Pulses.todrop(:,kk)));
         clear repper
     end
     
@@ -93,14 +89,10 @@ for ii = 1:length(Files)
         IRTest.time1(count) = Pulses.timestamp(1,kk);
         IRTest.time2(count) = Pulses.timestamp(1,kk+1);
         IRTest.voltageDeflection(count) = Pulses.voltage(kk+1) - Pulses.voltage(kk); %mV
-        IRTest.currentInjected(count) = -10/(Pulses.voltageInjected(kk+1)/1000); %nA; command is 10nA/V
-        IRTest.resistance(count) = ...
+        IRTest.currentInjected(count) = 10*(Pulses.voltageInjected(kk+1)/1000); %nA; command is 10nA/V
+        IRTest.resistance(count) = round(-...
             ((IRTest.voltageDeflection(count)/1000)/(IRTest.currentInjected(count)/(1*10^9))) ...
-            / (1*10^6); % MOhms(mega, not milli)
-        %         IRTest.resistance(count) = round( ...
-        %             (IRTest.voltageDeflection(count)/1000)/(IRTest.currentInjected(count)/(1*10^-9)) ...
-        %             / 1000000 ...
-        %             ,1); % MOhms(mega, not milli)
+            / (1*10^6),1); % MOhms(mega, not milli)
         count = count+1;
     end
     
