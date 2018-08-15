@@ -11,8 +11,8 @@ clear all
 
 folderold = cd;
 %% User editted info
-cd('C:\Data Processing\Processing\'); % Look for files in this folder
-Files = dir('1212*_All_trace_cleaned.txt'); % Find txt files containing this phrase to batch through
+cd('C:\Data Processing\Processing\1239\'); % Look for files in this folder
+Files = dir('*cleaned*.txt'); % Find txt files containing this phrase to batch through
 headers = 3; % number of rows containing numeric data in ascii file before the traces start
 
 %% Batch through all files in the folder
@@ -20,11 +20,11 @@ for ii = 1:length(Files)
     %% Import data
     filename = Files(ii).name;
     traces = importdata(filename);
-    Reps.stim = strrep(traces.textdata(1,2:end),' ','');
+    Reps.stim = strrep(traces.textdata(1,:),' ','');
     Reps.pulsepolarity = traces.data(1,:);
     Reps.pulsevoltage = traces.data(2,:);
     Reps.timestamp = traces.data(3,:);
-    Reps.trace = (traces.data(headers+1:end,:))/10;
+    Reps.trace = traces.data(headers+1:end,:);
     stimList = unique(Reps.stim);
     clear traces
     

@@ -12,8 +12,8 @@
 folderold = cd;
 %% User editted info
 % cd('D:\Intracellular\data analysis\processing\sub\'); % Look for files in this folder
-cd('C:\Data Processing\Processing\'); % Look for files in this folder
-Files = dir('1215*BatAgg*trace_*.txt'); % Find txt files containing this phrase to batch through
+cd('C:\Data Processing\Processing\1239\split\'); % Look for files in this folder
+Files = dir('*_cleaned*.txt'); % Find txt files containing this phrase to batch through
 
 prestim = 100; %ms in sweep before stim onset
 poststim = 900; %ms in sweep after stim onset
@@ -37,7 +37,7 @@ for ii = 1:length(Files)
     %% Spike detect
     Reps.spikeIndex = cell(1,reps);
     Reps.spikeHeight = cell(1,reps);
-    threshold = mode(mode(round(Reps.trace,1)))+30; % Set spike threshold to the lesser of rmp+10SD and -20mV
+    threshold = min(mode(mode(Reps.trace)) + 20); % Set spike threshold to the lesser of rmp+10SD and -20mV
     for i = 1:reps
         if any(Reps.trace(:,i)>threshold)
             [Reps.spikeHeight{i}, Reps.spikeIndex{i}] = findpeaks(Reps.trace(:,i), ...
@@ -57,7 +57,7 @@ for ii = 1:length(Files)
         if ~isempty(Reps.spikeIndex{i}) % Dont run for reps that have no spiking
             for p = 1:length(Reps.spikeIndex{i})
                 Reps.raster(Reps.spikeIndex{i}(p),i) = 1;
-                spikeremover(Reps.spikeIndex{i}(p)-spikelength:Reps.spikeIndex{i}(p)+spikelength,i) = true;
+                spikeremover(max(1,Reps.spikeIndex{i}(p)-spikelength):min(Reps.spikeIndex{i}(p)+spikelength, samples),i) = true;
                 spikeheight = cat(1, spikeheight, Reps.spikeHeight{i}(p));
             end
         end
@@ -75,7 +75,8 @@ for ii = 1:length(Files)
     [~, i] = max(movmean(p.Values,20));
     valuers = p.BinLimits(1):p.BinWidth:p.BinLimits(2)-p.BinWidth;
     rmp = valuers(i);
-    close p
+    clear p
+    close gcf
     
     %% PSTH with optional sliding window
     psth = sum(Reps.raster, 2)'; %"raster" created by intraSummary

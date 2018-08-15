@@ -14,13 +14,14 @@ clear all
 
 folderold = cd;
 %% User editted info
-cd('C:\Data Processing\Processing\'); % Look for files in this folder
-Files = dir('1212*3145*_All_trace.txt'); % Find txt files containing this phrase to batch through
-saver = false; % save split text files?
+cd('C:\Data Processing\Processing\1239\'); % Look for files in this folder
+Files = dir('*_All_trace.txt'); % Find txt files containing this phrase to batch through
 
-badrmp = -45; % Drop reps above this threshold
-driftrmp = 2.5; % +/- this amount allowed in rmp before dropping reps
+badrmp = -20; % Drop reps above this threshold
+driftrmpPOS = 35; % amount rmp is allowed to drift negative
+driftrmpNEG = 15; % amount rmp is allowed to drift negative
 minspike = 40; % minimum spike height allowed
+smoother = 3; % How many reps to smooth over
 headers = 3; % number of rows containing numeric data in ascii file before the traces start
 
 %% Batch through all files in the folder
@@ -35,6 +36,9 @@ for ii = 1:length(Files)
     Reps.trace = (traces.data(headers+1:end,:))/10;
     clear traces
     [samples, reps] = size(Reps.trace);
+    if reps < 2
+        continue
+    end
     Reps.todrop = false(1,reps);
     
     %% Drop reps if not sufficiently negative
@@ -42,19 +46,35 @@ for ii = 1:length(Files)
     Reps.todrop(Reps.rmp>badrmp) = true;
     
     %% Drop reps if spike height isn't good enough
-    threshold = min(mode(Reps.rmp(~Reps.todrop)) + 20); % Set spike threshold
+    threshold = max([min(mode(Reps.rmp(~Reps.todrop)) + 20),-35]); % Set spike threshold
+    Reps.meanspikeheight = nan(1,reps);
     for i = 1:reps
         if any(Reps.trace(:,i)>threshold)
             [spikeheight, ~] = findpeaks(Reps.trace(:,i), ...
                 'MinPeakHeight',threshold, ...
                 'MinPeakDistance', ceil(1.5/((1000)/samples)) ...
                 ); %Find spike peaks that break threshold and with a hold time of ~1s
-            if mean(spikeheight - Reps.rmp(i)) < minspike
+            Reps.meanspikeheight (i) = mean(spikeheight - Reps.rmp(i));
+            if Reps.meanspikeheight(i) < minspike
                 Reps.todrop(i) = true;
             end
             clear spikeheight
         end
     end
+    
+    % Drop reps if there's too much of a decrease in spike height (don't
+    % drop if overshoot)
+    spikeheighter = find(movmean(Reps.meanspikeheight,smoother)<(max(Reps.meanspikeheight)-20) ...
+        & (movmean(Reps.meanspikeheight + Reps.rmp,smoother)) < 0);
+    if ~isempty(spikeheighter)
+        if spikeheighter(1) > find(max(Reps.meanspikeheight))
+            Reps.todrop(spikeheighter(1):end) = true;
+        end
+        if spikeheighter(1) < find(max(Reps.meanspikeheight))
+            Reps.todrop(1:spikeheighter(end)) = true;
+        end
+    end
+    clear spikeheighter
     
     %% Drop reps if the rmp drifts
     % Don't include reps already marked to drop in overall measures of rmp
@@ -80,13 +100,13 @@ for ii = 1:length(Files)
     close gcf
     rmp(rmp>badrmp) = NaN;
     
-    Reps.todrop(Reps.pulsepolarity==-1 & (Reps.rmp < (rmp(1)-driftrmp) | Reps.rmp > (rmp(1)+driftrmp))) = true; % hyperpolarizing current reps
-    Reps.todrop(Reps.pulsepolarity==0 & (Reps.rmp < (rmp(2)-driftrmp) | Reps.rmp > (rmp(2)+driftrmp))) = true; % no current reps
-    Reps.todrop(Reps.pulsepolarity==1 & (Reps.rmp < (rmp(3)-driftrmp) | Reps.rmp > (rmp(3)+driftrmp))) = true; % depolarizing current reps
+    Reps.todrop(Reps.pulsepolarity==-1 & (Reps.rmp < (rmp(1)-driftrmpNEG) | Reps.rmp > (rmp(1)+driftrmpPOS))) = true; % hyperpolarizing current reps
+    Reps.todrop(Reps.pulsepolarity==0 & (Reps.rmp < (rmp(2)-driftrmpNEG) | Reps.rmp > (rmp(2)+driftrmpPOS))) = true; % no current reps
+    Reps.todrop(Reps.pulsepolarity==1 & (Reps.rmp < (rmp(3)-driftrmpNEG) | Reps.rmp > (rmp(3)+driftrmpPOS))) = true; % depolarizing current reps
     
     %% Clean droprep index
     % At least two consecutive reps needed to really drop reps
-    Reps.todrop(strfind(Reps.todrop, [0 0 0 1 0 0 0])+3) = false;
+    Reps.todrop(strfind(Reps.todrop, [0 1 0])+1) = false;
     
     % If reps are marked not to drop but are sufficiently within a string
     % of dropped reps, then drop them anyway
@@ -103,9 +123,11 @@ for ii = 1:length(Files)
     Reps.todrop(strfind(Reps.todrop, [1 0 1])+1) = true;
     
     % Only allow the first chunk of workable reps to remain
-    cleaner = find(diff(Reps.todrop)==-1);
-    if length(cleaner)>1
-        Reps.todrop(cleaner(2):end) = true;
+    cleaner = diff(Reps.todrop);
+    mark = strfind(cleaner(cleaner~=0),[1, -1]);
+    if ~isempty(mark)
+        cleaner = find(diff(Reps.todrop)~=0);
+        Reps.todrop(cleaner(mark(1)):end) = true;
         if ~any(Reps.pulsepolarity(~Reps.todrop)==-1)
             rmp(1) = NaN;
         end
@@ -139,12 +161,15 @@ for ii = 1:length(Files)
     ylim([-100 20])
     timeline = (Reps.timestamp/constant)+samples/2;
     plot(timeline, Reps.rmp, 'k', 'Linewidth', 2)
-    plot(timeline, repmat(rmp(1) - driftrmp, reps), 'b', 'Linewidth', 1)
-    plot(timeline, repmat(rmp(1) + driftrmp, reps), 'b', 'Linewidth', 1)
-    plot(timeline, repmat(rmp(2) - driftrmp, reps), 'k', 'Linewidth', 1)
-    plot(timeline, repmat(rmp(2) + driftrmp, reps), 'k', 'Linewidth', 1)
-    plot(timeline, repmat(rmp(3) - driftrmp, reps), 'r', 'Linewidth', 1)
-    plot(timeline, repmat(rmp(3) + driftrmp, reps), 'r', 'Linewidth', 1)
+    plot(timeline, repmat(rmp(1) - driftrmpNEG, reps), 'b', 'Linewidth', 1)
+    plot(timeline, repmat(rmp(1) , reps), 'b--', 'Linewidth', 1)
+    plot(timeline, repmat(rmp(1) + driftrmpPOS, reps), 'b', 'Linewidth', 1)
+    plot(timeline, repmat(rmp(2) - driftrmpNEG, reps), 'k', 'Linewidth', 1)
+    plot(timeline, repmat(rmp(2) , reps), 'k--', 'Linewidth', 1)
+    plot(timeline, repmat(rmp(2) + driftrmpPOS, reps), 'k', 'Linewidth', 1)
+    plot(timeline, repmat(rmp(3) - driftrmpNEG, reps), 'r', 'Linewidth', 1)
+    plot(timeline, repmat(rmp(3) , reps), 'r--', 'Linewidth', 1)
+    plot(timeline, repmat(rmp(3) + driftrmpPOS, reps), 'r', 'Linewidth', 1)
     
     plot(timeline, Reps.todrop * 18, 'g', 'Linewidth', 2)
     plot(timeline, Reps.pulsepolarity * 5 - 90, 'r', 'Linewidth', 2)
@@ -155,9 +180,12 @@ for ii = 1:length(Files)
     clear timeline
     
     testname = ['x', strrep(filename, '.txt','')];
-    %     print('-dtiff','-r500',[testname,'_dropreps.tif'])
+    print('-dtiff','-r500',[testname,'_dropreps.tif'])
     
     %% Drop Reps and save cleaned .txt file
+    if sum(~Reps.todrop)< 3
+        continue
+    end
     Reps.stim(:,Reps.todrop) = [];
     Reps.trace(:,Reps.todrop) = [];
     Reps.pulsepolarity(:,Reps.todrop) = [];
