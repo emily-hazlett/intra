@@ -1,7 +1,7 @@
 prompt = {'Folder containing files','Files to use'};
 dlg_title = 'Input';
 num_lines = [1, 100];
-defAns = {'C:\Users\emily\Desktop\bigone\', '*_trace.txt'};
+defAns = {'C:\Users\emily\Desktop\bigone\good\', '*_tracetime.txt'};
 options.Resize='on';
 answer = inputdlg(prompt, dlg_title, num_lines, defAns, options);
 
@@ -33,43 +33,31 @@ switch button
         ii = str2double(answer{1});
 end
 
-decent = cell(1,1);
-decentN = 0;
-shit = cell(1,1);
-shitN = 0;
-eh = cell(1,1);
-ehN = 0;
+% folderOld = cd;
+% folderNew = 'C:\Users\emily\Desktop\bigone\good\';
+% cd(folderNew);
+% Files = dir('*3821*_tracetime.txt');
 
 p = figure('units','normalized','outerposition',[0 0 1 1]);
 
 for i = ii:length(Files)
     filename = Files(i).name;
-    sweeps = importdata(filename);
-    rmp = mean(sweeps,2);
-    
-    plot(rmp)
-    ylim([-1000 200])
-    title(filename, 'interpreter', 'none')
-    figure(p)
-    
-    button = questdlg('File remotely decent?', ...
-        'Sorter', ...
-        'Yes', 'Hell no', 'Eh?', 'Eh?');
-    switch button
-        case 'Yes'
-            decentN= decentN + 1;
-            decent{decentN,1} = [folderNew, filename];
-        case 'Hell no'
-            shitN = shitN + 1;
-            shit{shitN,1} = [folderNew, filename];
-        case 'Eh?'
-            ehN = ehN + 1;
-            eh{ehN,1} = [folderNew, filename];
+    load(filename);
+    markername = strrep(filename, '.mat', '_marker.txt');
+    if exist(markername, 'file') == 0
+        IntraData.stimname = {};
+        IntraData.markertime = [];
+        IntraData.pulsedir = [];
+        IntraData.pulseamp = [];
+        IntraData.markerselect = [];
+        save(filename, 'IntraData')
+    else
+        marker = importdata(markername);
+        IntraData.stimname = marker.textdata(1, 2:end);
+        IntraData.markertime = marker.data(3,:);
+        IntraData.pulsedir = marker.data(1,:);
+        IntraData.pulseamp = marker.data(2,:);
+        save(filename, 'IntraData')
     end
-    
-    if isempty(button) == 1
-        warndlg(['File location stopped at is ', num2str(i)])
-        return
-    end
+    clear IntraData marker markername filename
 end
-

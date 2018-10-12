@@ -45,9 +45,13 @@ p = figure('units','normalized','outerposition',[0 0 1 1]);
 for i = ii:length(Files)
     filename = Files(i).name;
     sweeps = importdata(filename);
-    rmp = mean(sweeps,2);
+    %     rmp = mean(sweeps,2);
     
-    plot(rmp)
+    %     plot(rmp)
+    sweeps = sweeps(:,1:2:end);
+    sweeps = reshape(sweeps', 1, numel(sweeps));
+    
+    plot(sweeps)
     ylim([-1000 200])
     title(filename, 'interpreter', 'none')
     figure(p)
